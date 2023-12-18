@@ -17,8 +17,27 @@
  * - [ ] Memory Pool Allocator
  * - [ ] Logging Allocator
  *
+ *   HOW TO USE
  *
- *   Some notes:
+ * To get this library working you need to define either VINC_MEMALLOCS_IMPL or
+ * VINC_IMPL in *one* c source file. Like this:
+ *	...
+ *   -> #define VINC_MEMALLOCS_IMPL
+ *      #include <vinc_memallocs.h>
+ * 	...
+ *
+ * If you want to redefine global allocator, used by default (malloc), do this:
+ * 	...
+ *   -> #define VINC_PROVIDE_CUSTOM_GLOBAL_ALLOCATOR
+ *      #include <vinc_memallocs.h>
+ * 	...
+ *	void *__std_alloc_func(vinc_allocator_t* _, size_t size) { ... }
+ *	void __std_free_func(vinc_allocator_t* _, void *ptr) { ... }
+ *	void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size)
+ * 	{...}
+ * 	...
+ *
+ *   SOME NOTES:
  *
  * - Naming Conventions
  *
@@ -30,7 +49,7 @@
  * Prefix `__vinc` is used for function and types that are not supposed to be
  * called outsize the library header;
  *
- *   Ideas for later:
+ *   IDEAS FOR LATER:
  *
  * - Get rid of using libc functions in code. Redefine all the needed macros...
  *   Not sure, i really want it for now. But might be useful for some people on
@@ -61,12 +80,23 @@ typedef struct vinc_allocator {
     vinc_realloc_func_t realloc;
 } vinc_allocator_t;
 
-#ifdef VINC_GLOBAL_ALLOCATOR_DEFINITION
 
 void *__std_alloc_func(vinc_allocator_t* _, size_t size);
 void __std_free_func(vinc_allocator_t* _, void *ptr);
 void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size);
 
+/**
+ * Definition of the global allocator interface.
+ *
+ * Serves as the basic memory allocator to be used, when user doesn't provide
+ * local parant allocator for custome memory alloctors. By default, it uses
+ * pointers to default libc `malloc`, 'free' and 'realloc'. But can be redined
+ * by user this way:
+ *
+ * 	#define VINC_MEMALLOCS_IMPL
+ *   -> #define VINC_MEMALLOCS_CUSTOM_GLOBAL_ALLOCATOR
+ * 	#include <vinc_memallocs.h>
+ */
 const vinc_allocator_t __vinc_global_alloc = {
     .parent = NULL,
     .alloc = __std_alloc_func,
@@ -74,14 +104,31 @@ const vinc_allocator_t __vinc_global_alloc = {
     .realloc = __std_realloc_func
 };
 
-#endif // VINC_GLOBAL_ALLOCATOR_DEFINITION
+#if defined(VINC_MEMALLOCS_IMPL) || defined(VINC_IMPL)
 
+#ifndef VINC_PROVIDE_CUSTOM_GLOBAL_ALLOCATOR
+#include <malloc.h>
+
+void *__std_alloc_func(vinc_allocator_t* _, size_t size) {
+    return malloc(size);
+}
+void __std_free_func(vinc_allocator_t* _, void *ptr) {
+    free(ptr);
+}
+void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size) {
+    return realloc(ptr, size);
+}
+#endif // VINC_MEMALLOCS_CUSTOM_GLOBAL_ALLOCATOR
+
+#endif // VINC_MEMALLOCS_IMPL
 #endif // VINC_MEMALLOCS_H
 
 /**
  * Changle Log
  *
  * 12/18/2023 - project started
+ *            - added `vinc_allocator_t` inteface
+ *            - added __vinc_global_alloc constant
  */
 
 /**
@@ -110,4 +157,3 @@ const vinc_allocator_t __vinc_global_alloc = {
  *
  *  For more information, please refer to <https://unlicense.org>
  */
-
