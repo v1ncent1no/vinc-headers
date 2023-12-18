@@ -10,8 +10,6 @@
  *       functions:
  *       	void *__std_alloc_func(vinc_allocator_t*, size_t mem);
  *       	void *__std_free_func(vinc_allocator_t*, void *ptr);
- *       	void *__std_realloc_func(vinc_allocator_t*, void *ptr,
- * 					 size_t mem);
  * - [ ] Arena Allocator
  * - [ ] Fixed Buffer Allocator
  * - [ ] Memory Pool Allocator
@@ -33,7 +31,6 @@
  * 	...
  *	void *__std_alloc_func(vinc_allocator_t* _, size_t size) { ... }
  *	void __std_free_func(vinc_allocator_t* _, void *ptr) { ... }
- *	void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size)
  * 	{...}
  * 	...
  *
@@ -66,8 +63,6 @@ typedef void *(*vinc_alloc_func_t)(struct vinc_allocator* allocator,
 								   size_t memory);
 typedef void (*vinc_free_func_t)(struct vinc_allocator* allocator,
 								 void *ptr);
-typedef void *(*vinc_realloc_func_t)(struct vinc_allocator* allocator,
-									 void *ptr, size_t size);
 
 typedef struct vinc_allocator {
     /**
@@ -77,13 +72,11 @@ typedef struct vinc_allocator {
     struct vinc_allocator *parent;
     vinc_alloc_func_t alloc;
     vinc_free_func_t free;
-    vinc_realloc_func_t realloc;
 } vinc_allocator_t;
 
 
 void *__std_alloc_func(vinc_allocator_t* _, size_t size);
 void __std_free_func(vinc_allocator_t* _, void *ptr);
-void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size);
 
 /**
  * Definition of the global allocator interface.
@@ -93,15 +86,14 @@ void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size);
  * pointers to default libc `malloc`, 'free' and 'realloc'. But can be redined
  * by user this way:
  *
- * 	#define VINC_MEMALLOCS_IMPL
- *   -> #define VINC_MEMALLOCS_CUSTOM_GLOBAL_ALLOCATOR
- * 	#include <vinc_memallocs.h>
+ *     #define VINC_MEMALLOCS_IMPL
+ *  -> #define VINC_MEMALLOCS_CUSTOM_GLOBAL_ALLOCATOR
+ *     #include <vinc_memallocs.h>
  */
 const vinc_allocator_t __vinc_global_alloc = {
     .parent = NULL,
     .alloc = __std_alloc_func,
     .free = __std_free_func,
-    .realloc = __std_realloc_func
 };
 
 /**
@@ -130,7 +122,6 @@ void vinc_arena_deinit(vinc_arena_allocator_t* arena);
 
 void *vinc_arena_alloc(vinc_arena_allocator_t* arena, size_t size);
 void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr); // No-Op
-void *vinc_arena_realloc(vinc_arena_allocator_t* arena, void *ptr, size_t size);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// IMPLEMENTATION PART
@@ -159,9 +150,6 @@ void *__std_alloc_func(vinc_allocator_t* _, size_t size) {
 void __std_free_func(vinc_allocator_t* _, void *ptr) {
     free(ptr);
 }
-void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size) {
-    return realloc(ptr, size);
-}
 #endif // VINC_MEMALLOCS_CUSTOM_GLOBAL_ALLOCATOR
 
 
@@ -181,67 +169,99 @@ void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size) {
 static inline void *__vinc_allocate_region(vinc_arena_allocator_t* arena,
 					   size_t size) {
     struct __vinc_arena_region* region = arena->parent->alloc(
-		(vinc_allocator_t *) &arena->parent,
+		(vinc_allocator_t *) arena->parent,
 		sizeof(region[0])
     );
     region->rawmem = arena->parent->alloc(
-		(vinc_allocator_t *) &arena->parent,
+		(vinc_allocator_t *) arena->parent,
 		size
     );
 	region->pointer = region->rawmem;
 	region->size = size;
 
-    return region;
+	return region;
+}
+
+static inline void __vinc_free_region(vinc_arena_allocator_t *arena,
+									  struct __vinc_arena_region *region) {
+	arena->parent->free((vinc_allocator_t *) arena->parent, region->rawmem);
+	arena->parent->free((vinc_allocator_t *) arena->parent, region);
 }
 
 void* vinc_arena_region_alloc(
-    vinc_arena_allocator_t *arena,
-    size_t size
+	vinc_arena_allocator_t *arena,
+	size_t size
 ){
-    struct __vinc_arena_region *region = arena->root;
-    if (!region) {
+	struct __vinc_arena_region *region = arena->root;
+	if (!region) {
 		region = __vinc_allocate_region(
 			arena, __VINC_MAX(size, arena->min_region_size)
 		);
 		arena->root = region;
 		return region->pointer;
-    }
+	}
 
-    while (!region->next)
+	while (!region->next)
 		region = region->next;
 
-    if (region->size - (region->rawmem - region->pointer) < size) {
+	if (region->size - (region->rawmem - region->pointer) < size) {
 		region->next = __vinc_allocate_region(
 			arena, __VINC_MAX(size, arena->min_region_size)
 		);
 		return region->next->pointer;
-    }
+	}
 
-    void* ptr = region->pointer;
-    region->pointer = (void*)((size_t)region->pointer + size);
+	void* ptr = region->pointer;
+	region->pointer = (void*)((size_t)region->pointer + size);
 
-    return ptr;
+	return ptr;
 }
 
 void vinc_arena_init(vinc_arena_allocator_t* arena, vinc_allocator_t *parent,
 					 size_t min_region_size) {
-    arena->min_region_size = min_region_size;
-    if (parent)
+	arena->min_region_size = min_region_size;
+	if (parent)
 		arena->parent = parent;
-    else
+	else
 		arena->parent = &__vinc_global_alloc;
 }
 void vinc_arena_deinit(vinc_arena_allocator_t* arena) {
+	struct __vinc_arena_region *region = arena->root;
+	// NOTE :not gonna chech the region for NULL
 
+	while (region->next) {
+		struct __vinc_arena_region *next = region->next;
+		__vinc_free_region(arena, region);
+		region = next;
+	}
 }
 
+/**
+ * Currently "safe" version
+ * TODO: Implement unsafe version
+ */
 void *vinc_arena_alloc(vinc_arena_allocator_t* arena, size_t size) {
-    return NULL; // FIXME
-}
+	if (!arena->root) {
+		arena->root = vinc_arena_region_alloc(
+			arena,
+			__VINC_MAX(size, arena->min_region_size)
+		);
+		return arena->root->pointer;
+	}
 
-void *vinc_arena_realloc(vinc_arena_allocator_t* arena, void *ptr,
-						 size_t size) {
-    return NULL; // FIXME
+	struct __vinc_arena_region *region = arena->root;
+	while (region->next)
+		region = region->next;
+
+	if ((region->pointer - region->rawmem) < size) {
+		region->next = __vinc_allocate_region(arena, size);
+		return region->rawmem;
+	}
+
+	void *ptr = region->pointer;
+	region->pointer = (void*) ((size_t) region->pointer + size);
+
+    return ptr;
 }
 
 void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr) {} // No-Op
@@ -254,7 +274,7 @@ void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr) {} // No-Op
  *
  * 12/18/2023 - project started
  *            - added `vinc_allocator_t` inteface
- *            - added __vinc_global_alloc constant
+ *            - added `__vinc_global_alloc` constant
  */
 
 /**
