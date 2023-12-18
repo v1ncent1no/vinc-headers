@@ -2,7 +2,7 @@
  *
  * LICENSE
  *
- * 	See end of file for license information.
+ *   See end of file for license information.
  *
  * TODO:
  * - [ ] Unified Allocator Inteface
@@ -10,6 +10,15 @@
  * - [ ] Fixed Buffer Allocator
  * - [ ] Memory Pool Allocator
  * - [ ] Logging Allocator
+ *
+ *   Some notes:
+ *
+ *   Naming Conventions
+ *
+ * Yes, I am using postfix `_t` for types defined by typedef. I know that it's'
+ * bad, It's a matter of personal preference, and you can either use
+ * `struct ...` type variation, just find and remove them in code. I justify
+ * this by  using `vinc_` prefix.
  */
 
 #ifndef VINC_MEMALLOCS_H
