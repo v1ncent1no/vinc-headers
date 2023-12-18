@@ -5,25 +5,76 @@
  *   See end of file for license information.
  *
  * TODO:
- * - [ ] Unified Allocator Inteface
+ * - [X] Unified Allocator Inteface
+ * - [X] Allow user to change the global allocator by providing definition for
+ *       functions:
+ *       	void *__std_alloc_func(vinc_allocator_t*, size_t mem);
+ *       	void *__std_free_func(vinc_allocator_t*, void *ptr);
+ *       	void *__std_realloc_func(vinc_allocator_t*, void *ptr,
+ * 					 size_t mem);
  * - [ ] Arena Allocator
  * - [ ] Fixed Buffer Allocator
  * - [ ] Memory Pool Allocator
  * - [ ] Logging Allocator
  *
+ *
  *   Some notes:
  *
- *   Naming Conventions
+ * - Naming Conventions
  *
  * Yes, I am using postfix `_t` for types defined by typedef. I know that it's'
  * bad, It's a matter of personal preference, and you can either use
  * `struct ...` type variation, just find and remove them in code. I justify
  * this by  using `vinc_` prefix.
+ *
+ * Prefix `__vinc` is used for function and types that are not supposed to be
+ * called outsize the library header;
+ *
+ *   Ideas for later:
+ *
+ * - Get rid of using libc functions in code. Redefine all the needed macros...
+ *   Not sure, i really want it for now. But might be useful for some people on
+ *   embedded systems
  */
 
 #ifndef VINC_MEMALLOCS_H
 #define VINC_MEMALLOCS_H
 
+#include <stdlib.h>
+
+struct vinc_allocator;
+typedef void *(*vinc_alloc_func_t)(struct vinc_allocator* allocator,
+				   size_t memory);
+typedef void (*vinc_free_func_t)(struct vinc_allocator* allocator,
+				 void *ptr);
+typedef void *(*vinc_realloc_func_t)(struct vinc_allocator* allocator,
+				     void *ptr, size_t size);
+
+typedef struct vinc_allocator {
+    /**
+     * `parent` refers to a parent allocator, used by custom allocators in this
+     * module.
+     */
+    struct vinc_allocator *parent;
+    vinc_alloc_func_t alloc;
+    vinc_free_func_t free;
+    vinc_realloc_func_t realloc;
+} vinc_allocator_t;
+
+#ifdef VINC_GLOBAL_ALLOCATOR_DEFINITION
+
+void *__std_alloc_func(vinc_allocator_t* _, size_t size);
+void __std_free_func(vinc_allocator_t* _, void *ptr);
+void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size);
+
+const vinc_allocator_t __vinc_global_alloc = {
+    .parent = NULL,
+    .alloc = __std_alloc_func,
+    .free = __std_free_func,
+    .realloc = __std_realloc_func
+};
+
+#endif // VINC_GLOBAL_ALLOCATOR_DEFINITION
 
 #endif // VINC_MEMALLOCS_H
 
