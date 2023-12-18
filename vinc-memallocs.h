@@ -1,4 +1,4 @@
-/** vinc-memalloc - v0.0.1 - public domain custon memory allocators' loader
+/** vinc-memalloc - v0.0.1 - public domain custom memory allocators in pure c
  *
  * LICENSE
  *
@@ -105,6 +105,37 @@ const vinc_allocator_t __vinc_global_alloc = {
 };
 
 /**
+ * Declaration of custom arena allocator implemented as a linked-list. It uses
+ * `struct __vinc_arena_region` as it's nodes.
+ *
+ * TODO: Complete the docs
+ */
+struct __vinc_arena_region {
+    struct __vinc_arena_region*  next;
+    size_t size;
+    void* rawmem;
+    void* pointer;
+};
+
+typedef struct vinc_arena_allocator {
+    const vinc_allocator_t* parent;
+    size_t min_region_size;
+    struct __vinc_arena_region *root;
+} vinc_arena_allocator_t;
+
+
+void vinc_arena_init(vinc_arena_allocator_t* arena, vinc_allocator_t *parent,
+		     size_t min_region_size);
+void vinc_arena_deinit(vinc_arena_allocator_t* arena);
+
+void *vinc_arena_alloc(vinc_arena_allocator_t* arena, size_t size);
+void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr); // No-Op
+void *vinc_arena_realloc(vinc_arena_allocator_t* arena, void *ptr, size_t size);
+
+////////////////////////////////////////////////////////////////////////////////
+/// IMPLEMENTATION PART
+
+/**
  * Following code is implenation that is included into *one* source file that
  * should #define either VINC_MEMALLOCS_IMPL or VINC_IMPL.
  */
@@ -127,6 +158,47 @@ void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size) {
     return realloc(ptr, size);
 }
 #endif // VINC_MEMALLOCS_CUSTOM_GLOBAL_ALLOCATOR
+
+
+/**
+ * Implementation of `vinc_arena_allocator_t` methods.
+ *
+ * TODO: Write some details about this implementation
+ *
+ * NOTE: This implementation is expecting you to use it in the corect order, as
+ * 	 there's not NULL pointer checks, in order to provide max perfomance
+ * 	 implementation
+ * 	 TODO: Provide examples of corect `vinc_arena_allocator_t`'s usage order
+ */
+
+struct __vinc_arena_region *vinc_arena_region_alloc(vinc_allocator_t allocator,
+						   size_t size) {
+    return NULL; // FIXME
+}
+
+void vinc_arena_init(vinc_arena_allocator_t* arena, vinc_allocator_t *parent,
+		     size_t min_region_size) {
+    arena->min_region_size = min_region_size;
+    if (parent)
+	arena->parent = parent;
+    else
+	arena->parent = &__vinc_global_alloc;
+    // arena->root = vinc_arena_region_alloc();
+}
+void vinc_arena_deinit(vinc_arena_allocator_t* arena) {
+
+}
+
+void *vinc_arena_alloc(vinc_arena_allocator_t* arena, size_t size) {
+    return NULL; // FIXME
+}
+
+void *vinc_arena_realloc(vinc_arena_allocator_t* arena, void *ptr,
+			 size_t size) {
+    return NULL; // FIXME
+}
+
+void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr) {} // No-Op
 
 #endif // VINC_MEMALLOCS_IMPL
 #endif // VINC_MEMALLOCS_H
