@@ -135,6 +135,11 @@ void *vinc_arena_realloc(vinc_arena_allocator_t* arena, void *ptr, size_t size);
 ////////////////////////////////////////////////////////////////////////////////
 /// IMPLEMENTATION PART
 
+#define __VINC_MAX(A, B) \
+    (A) > (B) ? (A) : (B)
+#define __VINC_MIN(A, B) \
+    (A) < (B) ? (A) : (B)
+
 /**
  * Following code is implenation that is included into *one* source file that
  * should #define either VINC_MEMALLOCS_IMPL or VINC_IMPL.
@@ -169,11 +174,51 @@ void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size) {
  * 	 there's not NULL pointer checks, in order to provide max perfomance
  * 	 implementation
  * 	 TODO: Provide examples of corect `vinc_arena_allocator_t`'s usage order
+ *
+ * TODO: Rewrite this crap later, when enshure that it at least works
  */
+void* vinc_arena_region_alloc(
+    vinc_arena_allocator_t *arena,
+    size_t size
+){
+    struct __vinc_arena_region *region = arena->root;
+    if (!region) {
+	region = arena->parent->alloc(
+	    (vinc_allocator_t*) &arena->parent,
+	    sizeof(struct __vinc_arena_region)
+	);
+	region->size = __VINC_MAX(arena->min_region_size, size);
+	region->rawmem = arena->parent->alloc(
+	    (vinc_allocator_t*) &arena->parent,
+	    region->size
+	);
+	region->pointer = region->rawmem;
+	return region->pointer;
+    }
 
-struct __vinc_arena_region *vinc_arena_region_alloc(vinc_allocator_t allocator,
-						   size_t size) {
-    return NULL; // FIXME
+    while (!region->next)
+	region = region->next;
+
+    if (region->size - (region->rawmem - region->pointer) < size) {
+	region->next = arena->parent->alloc(
+	    (vinc_allocator_t*) &arena->parent,
+	    sizeof(struct __vinc_arena_region)
+	);
+	region = region->next;
+
+	region->size = __VINC_MAX(arena->min_region_size, size);
+	region->rawmem = arena->parent->alloc(
+	    (vinc_allocator_t*) &arena->parent,
+	    region->size
+	);
+	region->pointer = region->rawmem;
+	return region->pointer;
+    }
+
+    void* ptr = region->pointer;
+    region->pointer = (void*)((size_t)region->pointer + size);
+
+    return ptr;
 }
 
 void vinc_arena_init(vinc_arena_allocator_t* arena, vinc_allocator_t *parent,
