@@ -1,2 +1,4 @@
-
+# used only by me for testing, shouldn't bother anyone
 *.kdev4
+build_debug/*
+CMakeLists.txt
