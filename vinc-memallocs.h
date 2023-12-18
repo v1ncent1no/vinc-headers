@@ -204,7 +204,7 @@ void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr) {} // No-Op
 #endif // VINC_MEMALLOCS_H
 
 /**
- * Changle Log
+ * CHANGE LOG
  *
  * 12/18/2023 - project started
  *            - added `vinc_allocator_t` inteface
@@ -212,6 +212,8 @@ void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr) {} // No-Op
  */
 
 /**
+ *  LICENSE
+ *
  *  This is free and unencumbered software released into the public domain.
  *
  *  Anyone is free to copy, modify, publish, use, compile, sell, or
