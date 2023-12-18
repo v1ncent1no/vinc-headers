@@ -63,11 +63,11 @@
 
 struct vinc_allocator;
 typedef void *(*vinc_alloc_func_t)(struct vinc_allocator* allocator,
-				   size_t memory);
+								   size_t memory);
 typedef void (*vinc_free_func_t)(struct vinc_allocator* allocator,
-				 void *ptr);
+								 void *ptr);
 typedef void *(*vinc_realloc_func_t)(struct vinc_allocator* allocator,
-				     void *ptr, size_t size);
+									 void *ptr, size_t size);
 
 typedef struct vinc_allocator {
     /**
@@ -125,7 +125,7 @@ typedef struct vinc_arena_allocator {
 
 
 void vinc_arena_init(vinc_arena_allocator_t* arena, vinc_allocator_t *parent,
-		     size_t min_region_size);
+					 size_t min_region_size);
 void vinc_arena_deinit(vinc_arena_allocator_t* arena);
 
 void *vinc_arena_alloc(vinc_arena_allocator_t* arena, size_t size);
@@ -181,15 +181,15 @@ void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size) {
 static inline void *__vinc_allocate_region(vinc_arena_allocator_t* arena,
 					   size_t size) {
     struct __vinc_arena_region* region = arena->parent->alloc(
-	(vinc_allocator_t *) &arena->parent,
-	sizeof(region[0])
+		(vinc_allocator_t *) &arena->parent,
+		sizeof(region[0])
     );
     region->rawmem = arena->parent->alloc(
-	(vinc_allocator_t *) &arena->parent,
-	size
+		(vinc_allocator_t *) &arena->parent,
+		size
     );
-    region->pointer = region->rawmem;
-    region->size = size;
+	region->pointer = region->rawmem;
+	region->size = size;
 
     return region;
 }
@@ -200,21 +200,21 @@ void* vinc_arena_region_alloc(
 ){
     struct __vinc_arena_region *region = arena->root;
     if (!region) {
-	region = __vinc_allocate_region(
-	    arena, __VINC_MAX(size, arena->min_region_size)
-	);
-	arena->root = region;
-	return region->pointer;
+		region = __vinc_allocate_region(
+			arena, __VINC_MAX(size, arena->min_region_size)
+		);
+		arena->root = region;
+		return region->pointer;
     }
 
     while (!region->next)
-	region = region->next;
+		region = region->next;
 
     if (region->size - (region->rawmem - region->pointer) < size) {
-	region->next = __vinc_allocate_region(
-	    arena, __VINC_MAX(size, arena->min_region_size)
-	);
-	return region->next->pointer;
+		region->next = __vinc_allocate_region(
+			arena, __VINC_MAX(size, arena->min_region_size)
+		);
+		return region->next->pointer;
     }
 
     void* ptr = region->pointer;
@@ -224,12 +224,12 @@ void* vinc_arena_region_alloc(
 }
 
 void vinc_arena_init(vinc_arena_allocator_t* arena, vinc_allocator_t *parent,
-		     size_t min_region_size) {
+					 size_t min_region_size) {
     arena->min_region_size = min_region_size;
     if (parent)
-	arena->parent = parent;
+		arena->parent = parent;
     else
-	arena->parent = &__vinc_global_alloc;
+		arena->parent = &__vinc_global_alloc;
 }
 void vinc_arena_deinit(vinc_arena_allocator_t* arena) {
 
@@ -240,7 +240,7 @@ void *vinc_arena_alloc(vinc_arena_allocator_t* arena, size_t size) {
 }
 
 void *vinc_arena_realloc(vinc_arena_allocator_t* arena, void *ptr,
-			 size_t size) {
+						 size_t size) {
     return NULL; // FIXME
 }
 
