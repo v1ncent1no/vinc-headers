@@ -177,22 +177,33 @@ void *__std_realloc_func(vinc_allocator_t* _, void *ptr, size_t size) {
  *
  * TODO: Rewrite this crap later, when enshure that it at least works
  */
+
+static inline void *__vinc_allocate_region(vinc_arena_allocator_t* arena,
+					   size_t size) {
+    struct __vinc_arena_region* region = arena->parent->alloc(
+	(vinc_allocator_t *) &arena->parent,
+	sizeof(region[0])
+    );
+    region->rawmem = arena->parent->alloc(
+	(vinc_allocator_t *) &arena->parent,
+	size
+    );
+    region->pointer = region->rawmem;
+    region->size = size;
+
+    return region;
+}
+
 void* vinc_arena_region_alloc(
     vinc_arena_allocator_t *arena,
     size_t size
 ){
     struct __vinc_arena_region *region = arena->root;
     if (!region) {
-	region = arena->parent->alloc(
-	    (vinc_allocator_t*) &arena->parent,
-	    sizeof(struct __vinc_arena_region)
+	region = __vinc_allocate_region(
+	    arena, __VINC_MAX(size, arena->min_region_size)
 	);
-	region->size = __VINC_MAX(arena->min_region_size, size);
-	region->rawmem = arena->parent->alloc(
-	    (vinc_allocator_t*) &arena->parent,
-	    region->size
-	);
-	region->pointer = region->rawmem;
+	arena->root = region;
 	return region->pointer;
     }
 
@@ -200,19 +211,10 @@ void* vinc_arena_region_alloc(
 	region = region->next;
 
     if (region->size - (region->rawmem - region->pointer) < size) {
-	region->next = arena->parent->alloc(
-	    (vinc_allocator_t*) &arena->parent,
-	    sizeof(struct __vinc_arena_region)
+	region->next = __vinc_allocate_region(
+	    arena, __VINC_MAX(size, arena->min_region_size)
 	);
-	region = region->next;
-
-	region->size = __VINC_MAX(arena->min_region_size, size);
-	region->rawmem = arena->parent->alloc(
-	    (vinc_allocator_t*) &arena->parent,
-	    region->size
-	);
-	region->pointer = region->rawmem;
-	return region->pointer;
+	return region->next->pointer;
     }
 
     void* ptr = region->pointer;
@@ -228,7 +230,6 @@ void vinc_arena_init(vinc_arena_allocator_t* arena, vinc_allocator_t *parent,
 	arena->parent = parent;
     else
 	arena->parent = &__vinc_global_alloc;
-    // arena->root = vinc_arena_region_alloc();
 }
 void vinc_arena_deinit(vinc_arena_allocator_t* arena) {
 
