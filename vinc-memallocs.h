@@ -104,8 +104,16 @@ const vinc_allocator_t __vinc_global_alloc = {
     .realloc = __std_realloc_func
 };
 
+/**
+ * Following code is implenation that is included into *one* source file that
+ * should #define either VINC_MEMALLOCS_IMPL or VINC_IMPL.
+ */
 #if defined(VINC_MEMALLOCS_IMPL) || defined(VINC_IMPL)
 
+/**
+ * Providing global allocator as default libc's malloc if user hasn't provided
+ * his own definitions.
+ */
 #ifndef VINC_PROVIDE_CUSTOM_GLOBAL_ALLOCATOR
 #include <malloc.h>
 
