@@ -65,9 +65,9 @@ typedef void (*vinc_free_func_t)(struct vinc_allocator* allocator,
 								 void *ptr);
 
 typedef struct vinc_allocator {
-    struct vinc_allocator *parent;
-    vinc_alloc_func_t alloc;
-    vinc_free_func_t free;
+	struct vinc_allocator *parent;
+	vinc_alloc_func_t alloc;
+	vinc_free_func_t free;
 } vinc_allocator_t;
 
 
@@ -87,9 +87,9 @@ void __std_free_func(vinc_allocator_t* _, void *ptr);
  *     #include <vinc_memallocs.h>
  */
 const vinc_allocator_t __vinc_global_alloc = {
-    .parent = NULL,
-    .alloc = __std_alloc_func,
-    .free = __std_free_func,
+	.parent = NULL,
+	.alloc = __std_alloc_func,
+	.free = __std_free_func,
 };
 
 /**
@@ -99,16 +99,16 @@ const vinc_allocator_t __vinc_global_alloc = {
  * TODO: Complete the docs
  */
 struct __vinc_arena_region {
-    struct __vinc_arena_region*  next;
-    size_t size;
-    void* rawmem;
-    void* pointer;
+	struct __vinc_arena_region*  next;
+	size_t size;
+	void* rawmem;
+	void* pointer;
 };
 
 typedef struct vinc_arena_allocator {
-    const vinc_allocator_t* parent;
-    size_t min_region_size;
-    struct __vinc_arena_region *root;
+	const vinc_allocator_t* parent;
+	size_t min_region_size;
+	struct __vinc_arena_region *root;
 } vinc_arena_allocator_t;
 
 
@@ -123,9 +123,9 @@ void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr); // No-Op
 /// IMPLEMENTATION PART
 
 #define __VINC_MAX(A, B) \
-    (A) > (B) ? (A) : (B)
+	(A) > (B) ? (A) : (B)
 #define __VINC_MIN(A, B) \
-    (A) < (B) ? (A) : (B)
+	(A) < (B) ? (A) : (B)
 
 /**
  * Following code is implenation that is included into *one* source file that
@@ -141,10 +141,10 @@ void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr); // No-Op
 #include <malloc.h>
 
 void *__std_alloc_func(vinc_allocator_t* _, size_t size) {
-    return malloc(size);
+	return malloc(size);
 }
 void __std_free_func(vinc_allocator_t* _, void *ptr) {
-    free(ptr);
+	free(ptr);
 }
 #endif // VINC_MEMALLOCS_CUSTOM_GLOBAL_ALLOCATOR
 
@@ -166,14 +166,14 @@ static inline struct __vinc_arena_region *__vinc_allocate_region(
 	vinc_arena_allocator_t* arena,
 	size_t size, size_t offset
 ){
-    struct __vinc_arena_region* region = arena->parent->alloc(
+	struct __vinc_arena_region* region = arena->parent->alloc(
 		(vinc_allocator_t *) arena->parent,
 		sizeof(region[0])
-    );
-    region->rawmem = arena->parent->alloc(
+	);
+	region->rawmem = arena->parent->alloc(
 		(vinc_allocator_t *) arena->parent,
 		size
-    );
+	);
 	region->pointer =(void*) ((size_t)region->rawmem + offset);
 	region->size = size;
 
@@ -264,7 +264,7 @@ void *vinc_arena_alloc(vinc_arena_allocator_t* arena, size_t size) {
 	void *ptr = region->pointer;
 	region->pointer = (void*) ((size_t) region->pointer + size);
 
-    return ptr;
+	return ptr;
 }
 
 void vinc_arena_free(vinc_arena_allocator_t* arena, void *ptr) {} // No-Op
