@@ -65,10 +65,6 @@ typedef void (*vinc_free_func_t)(struct vinc_allocator* allocator,
 								 void *ptr);
 
 typedef struct vinc_allocator {
-    /**
-     * `parent` refers to a parent allocator, used by custom allocators in this
-     * module.
-     */
     struct vinc_allocator *parent;
     vinc_alloc_func_t alloc;
     vinc_free_func_t free;
@@ -166,8 +162,10 @@ void __std_free_func(vinc_allocator_t* _, void *ptr) {
  * TODO: Rewrite this crap later, when enshure that it at least works
  */
 
-static inline void *__vinc_allocate_region(vinc_arena_allocator_t* arena,
-					   size_t size) {
+static inline struct __vinc_arena_region *__vinc_allocate_region(
+	vinc_arena_allocator_t* arena,
+	size_t size, size_t offset
+){
     struct __vinc_arena_region* region = arena->parent->alloc(
 		(vinc_allocator_t *) arena->parent,
 		sizeof(region[0])
@@ -176,7 +174,7 @@ static inline void *__vinc_allocate_region(vinc_arena_allocator_t* arena,
 		(vinc_allocator_t *) arena->parent,
 		size
     );
-	region->pointer = region->rawmem;
+	region->pointer =(void*) ((size_t)region->rawmem + offset);
 	region->size = size;
 
 	return region;
@@ -192,22 +190,19 @@ void* vinc_arena_region_alloc(
 	vinc_arena_allocator_t *arena,
 	size_t size
 ){
-	struct __vinc_arena_region *region = arena->root;
-	if (!region) {
-		region = __vinc_allocate_region(
-			arena, __VINC_MAX(size, arena->min_region_size)
-		);
-		arena->root = region;
-		return region->pointer;
+	if (!arena->root) {
+		arena->root = __vinc_allocate_region(
+			arena, __VINC_MAX(size, arena->min_region_size), size);
+		return arena->root->rawmem;
 	}
 
+	struct __vinc_arena_region *region = arena->root;
 	while (!region->next)
 		region = region->next;
 
 	if (region->size - (region->rawmem - region->pointer) < size) {
 		region->next = __vinc_allocate_region(
-			arena, __VINC_MAX(size, arena->min_region_size)
-		);
+			arena, __VINC_MAX(size, arena->min_region_size), size);
 		return region->next->pointer;
 	}
 
@@ -220,6 +215,7 @@ void* vinc_arena_region_alloc(
 void vinc_arena_init(vinc_arena_allocator_t* arena, vinc_allocator_t *parent,
 					 size_t min_region_size) {
 	arena->min_region_size = min_region_size;
+	arena->root = NULL;
 	if (parent)
 		arena->parent = parent;
 	else
@@ -241,20 +237,27 @@ void vinc_arena_deinit(vinc_arena_allocator_t* arena) {
  * TODO: Implement unsafe version
  */
 void *vinc_arena_alloc(vinc_arena_allocator_t* arena, size_t size) {
-	if (!arena->root) {
-		arena->root = vinc_arena_region_alloc(
+	if (!arena->root)
+		return vinc_arena_region_alloc(
 			arena,
-			__VINC_MAX(size, arena->min_region_size)
+			size
 		);
-		return arena->root->pointer;
-	}
 
 	struct __vinc_arena_region *region = arena->root;
 	while (region->next)
 		region = region->next;
 
-	if ((region->pointer - region->rawmem) < size) {
-		region->next = __vinc_allocate_region(arena, size);
+	size_t current_size = __VINC_MAX(arena->min_region_size, size);
+
+	if ((region->pointer - region->rawmem) > current_size) {
+		region->next = __vinc_allocate_region(
+			arena,
+			current_size,
+			size
+		);
+		printf("[dt = %ld] [size = %ld] [[new region]] ",
+			region->pointer - region->rawmem, current_size);
+		fflush(stdout);
 		return region->rawmem;
 	}
 
